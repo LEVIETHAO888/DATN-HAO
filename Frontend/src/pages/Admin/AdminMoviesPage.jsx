@@ -5,6 +5,16 @@ import { ChevronLeft, Film, Pencil, Plus, Trash2 } from "lucide-react";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/$/, "");
 
+const STATUS_MAP = {
+  now_showing: { label: "Đang chiếu", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+  coming_soon: { label: "Sắp chiếu", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  ended:       { label: "Đã kết thúc", color: "bg-red-500/20 text-red-300 border-red-500/30" },
+};
+
+function getStatusInfo(status) {
+  return STATUS_MAP[status] || { label: status || "—", color: "bg-white/10 text-gray-300" };
+}
+
 const emptyForm = () => ({
   title: "",
   description: "",
@@ -16,9 +26,9 @@ const emptyForm = () => ({
   status: "coming_soon",
   language: "",
   country: "",
-  ageRating: "",
+  ageLimit: "",
   director: "",
-  actors: "",
+  castMembers: "",
   rating: "",
 });
 
@@ -86,9 +96,9 @@ export default function AdminMoviesPage() {
       status: m.status || "coming_soon",
       language: m.language || "",
       country: m.country || "",
-      ageRating: m.ageRating || m.age || "",
+      ageLimit: m.ageLimit || "",
       director: m.director || "",
-      actors: m.actors || "",
+      castMembers: m.castMembers || "",
       rating: m.rating != null ? String(m.rating) : "",
     });
     setModalOpen(true);
@@ -109,9 +119,9 @@ export default function AdminMoviesPage() {
       status: form.status || "coming_soon",
       language: form.language.trim() || null,
       country: form.country.trim() || null,
-      ageRating: form.ageRating.trim() || null,
+      ageLimit: form.ageLimit.trim() || null,
       director: form.director.trim() || null,
-      actors: form.actors.trim() || null,
+      castMembers: form.castMembers.trim() || null,
       rating: Number.isFinite(rating) ? rating : null,
     };
   }
@@ -231,9 +241,14 @@ export default function AdminMoviesPage() {
                         <td className="px-4 py-3 font-medium max-w-[200px] truncate">{m.title}</td>
                         <td className="px-4 py-3 text-gray-400 hidden md:table-cell">{m.genre || "—"}</td>
                         <td className="px-4 py-3">
-                          <span className="inline-block rounded-lg px-2 py-0.5 text-xs bg-white/10 text-gray-300">
-                            {m.status || "—"}
-                          </span>
+                          {(() => {
+                            const info = getStatusInfo(m.status);
+                            return (
+                              <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-semibold border ${info.color}`}>
+                                {info.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-gray-400 hidden sm:table-cell">{m.duration ?? "—"}</td>
                         <td className="px-4 py-3 text-right">
@@ -337,11 +352,11 @@ export default function AdminMoviesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Do tuoi</label>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Độ tuổi</label>
                     <input
-                      value={form.ageRating}
-                      onChange={(e) => setForm((f) => ({ ...f, ageRating: e.target.value }))}
-                      placeholder="Vi du: P, K, T13, T16, T18"
+                      value={form.ageLimit}
+                      onChange={(e) => setForm((f) => ({ ...f, ageLimit: e.target.value }))}
+                      placeholder="Ví dụ: P, K, T13, T16, T18"
                       className="w-full rounded-lg bg-[#3a3b3c] border border-white/10 px-3 py-2 outline-none"
                     />
                   </div>
@@ -358,8 +373,8 @@ export default function AdminMoviesPage() {
                   <div>
                     <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Diễn viên</label>
                     <input
-                      value={form.actors}
-                      onChange={(e) => setForm((f) => ({ ...f, actors: e.target.value }))}
+                      value={form.castMembers}
+                      onChange={(e) => setForm((f) => ({ ...f, castMembers: e.target.value }))}
                       placeholder="Ví dụ: Tên A, Tên B, Tên C"
                       className="w-full rounded-lg bg-[#3a3b3c] border border-white/10 px-3 py-2 outline-none"
                     />

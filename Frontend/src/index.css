@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   color-scheme: dark;
@@ -343,6 +343,14 @@ a {
   .card-row,
   .booking-card {
     align-items: flex-start;
-    flex-direction: column;
   }
+}
+
+/* Ẩn scrollbar toàn cục (Global Scrollbar Hide) cho trải nghiệm lướt mượt mà */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }

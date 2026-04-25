@@ -5,13 +5,13 @@ import { useAppContext } from "../App";
 export default function useNagivateLoading() {
   const { appState, setAppState } = useAppContext();
   const navigate = useNavigate();
-  return (pathNavigate) => {
+  return (pathNavigate, options) => {
     setAppState((prev) => ({
       ...prev,
       loading: true,
     }));
     setTimeout(() => {
-      navigate(pathNavigate);
+      navigate(pathNavigate, options);
       setAppState((prev) => ({
         ...prev,
         loading: false,

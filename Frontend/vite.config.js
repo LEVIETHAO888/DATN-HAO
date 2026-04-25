@@ -15,16 +15,16 @@ export default defineConfig({
     global: {},
   },
   server: {
-     host: true,                // cho phép truy cập public
+    host: true,                // cho phép truy cập public
     allowedHosts: [
-      "partly-erythemic-cleta.ngrok-free.dev"
+      "limpness-acting-eagle.ngrok-free.dev"
     ],
     proxy: {
       '/api': {
         target: 'http://localhost:8080', // BE Spring Boot
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''), // /api/vnpay/... -> /vnpay/...
+        // KHÔNG rewrite: backend đã map /api/... nên giữ nguyên path
       },
     },
   },

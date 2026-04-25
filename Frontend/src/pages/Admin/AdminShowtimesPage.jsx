@@ -5,6 +5,16 @@ import { CalendarClock, ChevronLeft, Pencil, Plus, Trash2 } from "lucide-react";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/$/, "");
 
+async function parseResponseBody(response) {
+  const raw = await response.text();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function toDatetimeLocalValue(value) {
   if (!value) return "";
   if (typeof value === "string") {
@@ -35,19 +45,19 @@ function formatVnDateTime(iso) {
 }
 
 
-function formatMovieStatus(status) {
-  const normalized = String(status || "").trim().toLowerCase();
+const STATUS_MAP = {
+  now_showing: { label: "Đang chiếu", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+  coming_soon: { label: "Sắp chiếu", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  ended:       { label: "Đã kết thúc", color: "bg-red-500/20 text-red-300 border-red-500/30" },
+};
 
-  switch (normalized) {
-    case "now_showing":
-      return "Dang chieu";
-    case "coming_soon":
-      return "Sap chieu";
-    case "ended":
-      return "Da ket thuc";
-    default:
-      return status || "Khong xac dinh";
-  }
+function getStatusInfo(status) {
+  const key = String(status || "").trim().toLowerCase();
+  return STATUS_MAP[key] || { label: status || "—", color: "bg-white/10 text-gray-300" };
+}
+
+function formatMovieStatus(status) {
+  return getStatusInfo(status).label;
 }
 
 const emptyForm = () => ({
@@ -78,19 +88,31 @@ export default function AdminShowtimesPage() {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [stRes, mvRes, rmRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/showtimes`, { headers }),
+        fetch(`${API_BASE}/showtimes`, { headers }),
         fetch(`${API_BASE}/movies`, { headers }),
         fetch(`${API_BASE}/rooms`, { headers }),
       ]);
-      const stData = await stRes.json();
-      const mvData = await mvRes.json();
-      const rmData = await rmRes.json();
-      if (!stRes.ok) throw new Error(typeof stData === "string" ? stData : stData?.message || "Không tải lịch chiếu");
-      if (!mvRes.ok) throw new Error("Không tải danh sách phim");
-      if (!rmRes.ok) throw new Error("Không tải danh sách phòng");
-      setShowtimes(Array.isArray(stData) ? stData : []);
-      setMovies(Array.isArray(mvData) ? mvData : []);
-      setRooms(Array.isArray(rmData) ? rmData : []);
+
+      const [stBody, mvBody, rmBody] = await Promise.all([
+        parseResponseBody(stRes),
+        parseResponseBody(mvRes),
+        parseResponseBody(rmRes),
+      ]);
+
+      if (!stRes.ok) {
+        throw new Error(typeof stBody === "string" ? stBody : stBody?.message || "Không tải lịch chiếu");
+      }
+
+      if (!mvRes.ok) {
+        throw new Error(typeof mvBody === "string" ? mvBody : mvBody?.message || "Không tải danh sách phim");
+      }
+      if (!rmRes.ok) {
+        throw new Error(typeof rmBody === "string" ? rmBody : rmBody?.message || "Không tải danh sách phòng");
+      }
+
+      setShowtimes(Array.isArray(stBody) ? stBody : []);
+      setMovies(Array.isArray(mvBody) ? mvBody : []);
+      setRooms(Array.isArray(rmBody) ? rmBody : []);
     } catch (e) {
       setError(e.message || "Lỗi mạng");
     } finally {
@@ -283,9 +305,14 @@ export default function AdminShowtimesPage() {
                       <tr key={st.id} className="hover:bg-white/[0.03]">
                         <td className="px-4 py-3 font-medium max-w-[180px] truncate">{st.movie?.title || `#${st.movie?.id}`}</td>
                         <td className="px-4 py-3 hidden md:table-cell">
-                          <span className="inline-block rounded-lg px-2 py-0.5 text-xs bg-white/10 text-gray-300">
-                            {formatMovieStatus(st.movie?.status)}
-                          </span>
+                          {(() => {
+                            const info = getStatusInfo(st.movie?.status);
+                            return (
+                              <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-semibold border ${info.color}`}>
+                                {info.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-gray-300 hidden lg:table-cell max-w-[200px] truncate">
                           {st.room ? roomLabel(st.room) : "—"}

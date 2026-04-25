@@ -28,7 +28,7 @@ const LoginPage = () => {
       }
 
       localStorage.setItem("accessToken", responseText);
-      navigate("/social/home");
+      navigate("/");
     } catch (error) {
       console.error("Lỗi khi gọi API:", error);
       setErrorMessage("Không thể kết nối tới server.");
@@ -43,7 +43,7 @@ const LoginPage = () => {
           <img src="/logo.png" className="h-[100px] drop-shadow-[0_10px_20px_rgba(0,139,208,0.8)]" />
           <div className="ml-3">
             <div className="text-4xl lg:text-5xl font-extrabold text-[#ffffff] flex justify-center drop-shadow-[0_10px_20px_rgba(0,139,208,0.4)]">
-              PhimNet
+              CineX
             </div>
             <div className="text-lg md:text-3xl font-bold text-[#ffffff] flex justify-center" style={{ fontFamily: "Smooch Sans" }}>
               Xem phim hay, kết nối ngay
@@ -81,7 +81,7 @@ const LoginPage = () => {
                   <div className="bg-white/80 rounded-2xl px-2">{errorMessage}</div>
                 </div>
                 <button
-                  htmlType="submit"
+                  type="submit"
                   className="px-6 py-2 mt-3 w-full text-white bg-blue-500/70 font-semibold rounded-lg shadow-md hover:bg-blue-600/90 hover:cursor-pointer transition"
                 >
                   Đăng nhập
@@ -95,7 +95,7 @@ const LoginPage = () => {
         </div>
       </div>
       <div className="bottom-0 right-3 text-[13px] absolute z-10">
-        <p>PhimNet</p>
+        <p>CineX</p>
       </div>
     </div>
   );

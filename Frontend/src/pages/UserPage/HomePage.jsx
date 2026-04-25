@@ -1,103 +1,102 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable no-unused-vars */
-import React, { useEffect, useState } from "react";
-import LayoutSocial from "../../components/LayoutSocial";
-import NavBarLeft from "../../components/HomePage/NavBarLeft";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import NavBarRight from "@/components/HomePage/NavBarRight";
-import NewsFeed from "../../components/HomePage/NewsFeed";
-import ModalNotification from "@/parts/ModalNotification";
-import "./custom-scroll-bar.css";
-import { fetchWithAuth } from "@/parts/FetchApiWithAuth";
-import InfiniteScroll from "react-infinite-scroll-component";
-import CreatePost from "@/components/Post/CreatePost";
+import React, { useState, useEffect } from "react";
+import Layout from "../../components/Layout";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
+import "swiper/css/navigation";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
+import useNagivateLoading from "@/hooks/useNagivateLoading";
+import MovieList from "@/components/Movie/MovieList";
+import QuickBookingBar from "@/components/Movie/QuickBookingBar";
 
 const HomePage = () => {
-  const [modalNotiProps, setModalNotiProps] = useState({});
-  const [isModalNotiOpen, setIsModalNotiOpen] = useState(false);
-
-  const [listPost, setListPost] = useState([]);
-  const [page, setPage] = useState(1);
-  const limit = 5;
-  const [hasMore, setHasMore] = useState(true);
-
-  const fetchNewsFeed = async () => {
-    try {
-      const res = await fetchWithAuth(
-        `${import.meta.env.VITE_API_URL}/posts/news-feed?page=${page}&limit=${limit}`,
-        {
-          method: "GET",
-        }
-      );
-      const response = await res.json();
-
-      if (response.status === "success") {
-        const newPosts = response.data;
-
-        setListPost((prev) => [...prev, ...newPosts]);
-
-        if (newPosts.length < limit) {
-          setHasMore(false);
-        } else {
-          setPage((prev) => prev + 1);
-        }
-      }
-    } catch (error) {
-      console.log("Có lỗi khi gọi api: ", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchNewsFeed();
-  }, []);
+  const navigateLoading = useNagivateLoading();
 
   return (
-    <LayoutSocial>
-      <div className="w-full pt-13 h-screen flex text-white bg-black/90 relative">
-        {/* left nav bar */}
-        <ScrollArea className="w-[25%] h-[calc(100vh-52px)] left-0 fixed">
-          <NavBarLeft />
-        </ScrollArea>
+    <Layout>
+      <div>
+        <div className="relative w-full h-[500px] overflow-hidden">
 
-        {/* home page */}
-        <div
-          className="w-[50%] h-[calc(100vh-52px)] overflow-y-auto flex flex-col items-center custom-scroll-bar"
-          id="scrollableDiv"
-        >
-          {/* Bài viết */}
-          <InfiniteScroll
-            dataLength={listPost.length}
-            next={fetchNewsFeed}
-            hasMore={hasMore}
-            scrollThreshold={0.9}
-            scrollableTarget="scrollableDiv"
-            loader={<h4>Đang tải thêm...</h4>}
-            endMessage={<p>Không còn bài viết nào.</p>}
-            className="w-full flex flex-col items-center"
+
+          <Swiper
+            spaceBetween={0}
+            slidesPerView={1}
+            autoplay={{ delay: 5000, disableOnInteraction: false }}
+            loop={true}
+            pagination={{ clickable: true, dynamicBullets: true }}
+            modules={[Navigation, Pagination, Autoplay]}
+            className="w-full h-full absolute inset-0 z-0"
           >
-            {/* tạo bài viết mới */}
-            <div className="w-[80%]">
-              <CreatePost
-                onPostCreated={(post) =>
-                  setListPost((prev) => (post ? [post, ...prev] : prev))
-                }
-              />
-              <NewsFeed listPost={listPost} isReaction={true} />
-            </div>
-          </InfiniteScroll>
+            <SwiperSlide>
+              <img src="/banner1.png" className="w-full h-full object-cover object-[center_top]" alt="Banner 1" />
+            </SwiperSlide>
+            <SwiperSlide>
+              <img src="/banner2.png" className="w-full h-full object-cover object-[center_top]" alt="Banner 2" />
+            </SwiperSlide>
+            <SwiperSlide>
+              <img src="/banner3.png" className="w-full h-full object-cover object-[center_top]" alt="Banner 3" />
+            </SwiperSlide>
+            <SwiperSlide>
+              <img src="/banner4.png" className="w-full h-full object-cover object-[center_top]" alt="Banner 4" />
+            </SwiperSlide>
+            <SwiperSlide>
+              <img src="/banner5.png" className="w-full h-full object-cover object-[center_top]" alt="Banner 5" />
+            </SwiperSlide>
+          </Swiper>
         </div>
 
-        {/* right nav bar */}
-        <ScrollArea className="w-[25%] h-[calc(100vh-52px)] fixed right-0">
-          <NavBarRight />
-        </ScrollArea>
+
+        <div className="h-auto relative pb-10">
+          <div className="bg-white/85 z-10 h-full w-full absolute top-0 left-0"></div>
+          <div className="bg-[#008bd0]/10 z-10 h-full w-full absolute top-0 left-0"></div>
+          <img src="/bg2.jpg" className="h-full w-full object-cover opacity-30 absolute top-0 left-0" />
+
+          <QuickBookingBar />
+
+          <div className="pt-2">
+            <MovieList title="Phim Đang Chiếu" viewMoreLink="/movies?tab=movies" titleClassName="text-transparent bg-clip-text bg-gradient-to-r from-[#008bd0] to-[#00bfff] drop-shadow-sm" hideSearch={true} status="now_showing" />
+          </div>
+          <MovieList title="Phim Sắp Chiếu" viewMoreLink="/movies?tab=upcoming" titleClassName="text-transparent bg-clip-text bg-gradient-to-r from-[#008bd0] to-[#00bfff] drop-shadow-sm" hideSearch={true} hideBooking={true} status="coming_soon" />
+        </div>
+
+        <div className="bg-[url('/bgX.png')] h-160 w-full relative flex flex-col pt-10">
+          <div className="bg-white opacity-95 h-full w-full z-5 absolute top-0 left-0" />
+          <div className="bg-[#208ff7] opacity-15 h-full w-full z-5 absolute top-0 left-0" />
+          <div className="h-[90%] ml-30 z-10 relative flex items-center">
+            <img
+              src="/aboutus.png"
+              alt="About CineX"
+              className="w-[30%] h-[60%] object-cover flex"
+              style={{
+                clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
+              }}
+            />
+            <div className="w-[70%] h-full flex items-center">
+              <div className="h-[60%] w-full ml-15 space-y-2">
+                <div
+                  className="w-40 text-[20px] p-2 flex justify-center bg-[#008bd0]/20 text-[#008bd0] font-bold"
+                >
+                  GIỚI THIỆU
+                </div>
+                <div className="text-[34px]">CineX</div>
+                <div className="w-[80%] text-justify">
+                  CineX là một nền tảng trực tuyến dành cho những người yêu điện ảnh.
+                  <br />
+                  <br />
+                  Nơi giao lưu và kết nối những người yêu điện ảnh, đặt vé nhanh chóng,
+                  nhận ưu đãi hấp dẫn, cập nhật lịch chiếu và sự kiện, chia sẻ đam mê phim ảnh.
+                </div>
+                <div
+                  className="w-40 text-[18px] p-2 mt-6 flex justify-center border-2 border-[#46acdf] text-[#008bd0] font-bold hover:bg-[#008bd0] hover:text-white hover:shadow-lg hover:shadow-[#008bd0] transition-all duration-300 cursor-pointer"
+                  onClick={() => navigateLoading("/about")}
+                >
+                  XEM THÊM &gt;&gt;
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <ModalNotification
-        isModalOpen={isModalNotiOpen}
-        setIsModalOpen={setIsModalNotiOpen}
-        {...modalNotiProps}
-      />
-    </LayoutSocial>
+    </Layout>
   );
 };
 

@@ -1,29 +1,36 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import LoadingNavigate from "./pages/LoadingNavigate";
-import MovieHomePage from "./pages/UserPage/MovieHomePage";
-import ClubHomePage from "./pages/UserPage/ClubHomePage";
+import HomePage from "./pages/UserPage/HomePage";
+import MoviesPage from "./pages/UserPage/MoviesPage";
+import AboutPage from "./pages/UserPage/AboutPage";
+import PromotionsPage from "./pages/UserPage/PromotionsPage";
 import MovieDetailPage from "./pages/UserPage/MovieDetailPage";
 import OrderTicket from "./pages/UserPage/OrderTicket";
 import OrderCombo from "./pages/UserPage/OrderCombo";
+import PaymentPage from "./pages/UserPage/PaymentPage";
 import AdminDashboardPage from "./pages/Admin/AdminDashboardPage";
 import AdminMoviesPage from "./pages/Admin/AdminMoviesPage";
 import AdminShowtimesPage from "./pages/Admin/AdminShowtimesPage";
 import AdminUsersPage from "./pages/Admin/AdminUsersPage";
-import SelectCinemaPage from "./pages/UserPage/SelectCinemaPage";
+import AdminCombosPage from "./pages/Admin/AdminCombosPage";
+import AdminPromotionsPage from "./pages/Admin/AdminPromotionsPage";
+import AdminBookingsPage from "./pages/Admin/AdminBookingsPage";
+import AdminCinemasPage from "./pages/Admin/AdminCinemasPage";
 import AccessDeniedPage from "./pages/AccessDeniedPage";
 import {
   canAccessAdminDashboard,
-  canManageMoviesAndShowtimes,
   getRoleIdFromToken,
   isSystemAdmin,
 } from "./utils/jwt";
-import CreateUser from "./components/Admin/UserManagement/CreateUser";
+import CreateUser from "./pages/Admin/UserManagement/CreateUser";
+import PaymentStatus from "./pages/UserPage/PaymentStatus";
+import PersonalPage from "./pages/UserPage/PersonalPage";
 
-const AppContext = createContext(null);
+export const AppContext = createContext(null);
 
 export function useAppContext() {
   const context = useContext(AppContext);
@@ -35,55 +42,70 @@ export function useAppContext() {
   return context;
 }
 
-function ProtectedRoute({ children }) {
+const AuthContext = createContext(null);
+
+export const AuthProvider = ({ children }) => {
+  const [isLogin, setIsLogin] = useState(!!localStorage.getItem("accessToken"));
+  const value = useMemo(() => ({ isLogin, setIsLogin }), [isLogin]);
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => useContext(AuthContext);
+
+const ProtectedRoute = ({ children, requireRole }) => {
   const token = localStorage.getItem("accessToken");
 
   if (!token) {
     return <Navigate replace to="/login" />;
   }
 
-  return children;
-}
+  if (requireRole) {
+    const hasRole = Array.isArray(requireRole)
+      ? requireRole.some((role) => role())
+      : requireRole();
 
-function RoleRoute({ children, allow }) {
-  const token = localStorage.getItem("accessToken");
-  const roleId = getRoleIdFromToken(token);
-
-  if (!allow(roleId)) {
-    return <Navigate replace to="/access-denied" />;
+    if (!hasRole) {
+      if (getRoleIdFromToken(token) === 1) {
+        return <Navigate replace to="/" />;
+      }
+      return <Navigate replace to="/access-denied" />;
+    }
   }
 
   return children;
-}
+};
 
 function AppRoutes() {
   const token = localStorage.getItem("accessToken");
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate replace to={token ? "/social/home" : "/login"} />} />
+      <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/access-denied" element={<AccessDeniedPage />} />
-      <Route path="/home-club" element={<ClubHomePage />} />
       <Route path="/movie/:id" element={<MovieDetailPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/promotions" element={<PromotionsPage />} />
       <Route
-        path="/social/home"
+        path="/movies"
         element={
           <ProtectedRoute>
-            <MovieHomePage />
+            <MoviesPage />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/select-cinema"
+        path="/payment"
         element={
           <ProtectedRoute>
-            <SelectCinemaPage />
+            <PaymentPage />
           </ProtectedRoute>
         }
       />
+      {/* Public: VNPay redirects here without auth header */}
+      <Route path="/payment-status" element={<PaymentStatus />} />
       <Route
         path="/order-ticket"
         element={
@@ -93,7 +115,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/order-ticket/combo"
+        path="/order-combo"
         element={
           <ProtectedRoute>
             <OrderCombo />
@@ -103,59 +125,135 @@ function AppRoutes() {
       <Route
         path="/admin/dashboard"
         element={
-          <ProtectedRoute>
-            <RoleRoute allow={canAccessAdminDashboard}>
-              <AdminDashboardPage />
-            </RoleRoute>
+          <ProtectedRoute
+            requireRole={() =>
+              canAccessAdminDashboard(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminDashboardPage />
           </ProtectedRoute>
         }
       />
       <Route
         path="/admin/movies"
         element={
-          <ProtectedRoute>
-            <RoleRoute allow={canManageMoviesAndShowtimes}>
-              <AdminMoviesPage />
-            </RoleRoute>
+          <ProtectedRoute
+            requireRole={() =>
+              isSystemAdmin(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminMoviesPage />
           </ProtectedRoute>
         }
       />
       <Route
         path="/admin/showtimes"
         element={
-          <ProtectedRoute>
-            <RoleRoute allow={canManageMoviesAndShowtimes}>
-              <AdminShowtimesPage />
-            </RoleRoute>
+          <ProtectedRoute
+            requireRole={() =>
+              isSystemAdmin(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminShowtimesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/cinemas"
+        element={
+          <ProtectedRoute
+            requireRole={() =>
+              isSystemAdmin(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminCinemasPage />
           </ProtectedRoute>
         }
       />
       <Route
         path="/admin/users"
         element={
-          <ProtectedRoute>
-            <RoleRoute allow={isSystemAdmin}>
-              <AdminUsersPage />
-            </RoleRoute>
+          <ProtectedRoute
+            requireRole={() =>
+              isSystemAdmin(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminUsersPage />
           </ProtectedRoute>
         }
       />
       <Route
         path="/admin/users/create"
         element={
-          <ProtectedRoute>
-            <RoleRoute allow={isSystemAdmin}>
-              <CreateUser />
-            </RoleRoute>
+          <ProtectedRoute
+            requireRole={() =>
+              isSystemAdmin(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <CreateUser />
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate replace to={token ? "/social/home" : "/login"} />} />
+      <Route
+        path="/profile/:id"
+        element={
+          <ProtectedRoute>
+            <PersonalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/combos"
+        element={
+          <ProtectedRoute
+            requireRole={() =>
+              canAccessAdminDashboard(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminCombosPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/promotions"
+        element={
+          <ProtectedRoute
+            requireRole={() =>
+              canAccessAdminDashboard(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminPromotionsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/bookings"
+        element={
+          <ProtectedRoute
+            requireRole={() =>
+              canAccessAdminDashboard(getRoleIdFromToken(localStorage.getItem("accessToken")))
+            }
+          >
+            <AdminBookingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>
   );
 }
 
-function App() {
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
+
+const App = () => {
   const [appState, setAppState] = useState({
     loading: false,
   });
@@ -165,11 +263,14 @@ function App() {
   return (
     <AppContext.Provider value={contextValue}>
       <BrowserRouter>
-        <LoadingNavigate />
-        <AppRoutes />
+        <ScrollToTop />
+        <AuthProvider>
+          <LoadingNavigate />
+          <AppRoutes />
+        </AuthProvider>
       </BrowserRouter>
     </AppContext.Provider>
   );
-}
+};
 
 export default App;

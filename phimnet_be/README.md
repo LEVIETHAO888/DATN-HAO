@@ -1,4 +1,4 @@
-# PHIMNET BACKEND
+﻿# CINEX BACKEND
 
 ## 🚀 Cách chạy
 

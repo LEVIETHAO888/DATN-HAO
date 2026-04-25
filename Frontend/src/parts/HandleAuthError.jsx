@@ -22,7 +22,7 @@ export const handleAuthError = (
   } else if (isSocialPath) {
     setModalNotiProps({
       modalTitle: "Bạn chưa đăng nhập",
-      modalMessage: "Vui lòng đăng nhập để sử dụng PhimNet!",
+      modalMessage: "Vui lòng đăng nhập để sử dụng CineX!",
       buttonText: "Đăng nhập",
       redirectPath: "/login",
     });

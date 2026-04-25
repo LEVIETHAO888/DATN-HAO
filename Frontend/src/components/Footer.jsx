@@ -6,7 +6,7 @@ const Footer = () => {
       <div className="flex">
         <div className="w-[30%] flex flex-col ml-15 mt-5 mr-10 space-y-3">
           <img src="/public/logo.png" className="h-30 w-30 ml-15" />
-          <p className="font-bold">PhimNet</p>
+          <p className="font-bold">CineX</p>
           <p className="">Email: haole203ziza@gmail.com</p>
           <p className="">Hotline: 0949086204</p>
         </div>
@@ -38,7 +38,7 @@ const Footer = () => {
         </div>
       </div>
       <div className="pt-8 w-full flex justify-center">
-        <p> phimnet.com </p>
+        <p> CineX.com </p>
       </div>
     </div>
   );

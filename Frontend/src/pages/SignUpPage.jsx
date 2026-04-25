@@ -61,7 +61,7 @@ const SignUpPage = () => {
         <div className="h-[20%] space-y-2 flex items-center justify-center">
           <img src="/logo.png" className="h-[100px] drop-shadow-[0_10px_20px_rgba(0,139,208,0.8)]" />
           <div className="ml-3">
-            <div className="text-4xl lg:text-5xl font-extrabold text-[#1f2937] flex justify-center">PhimNet</div>
+            <div className="text-4xl lg:text-5xl font-extrabold text-[#1f2937] flex justify-center">CineX</div>
             <div className="text-lg md:text-3xl font-bold text-[#1f2937] flex justify-center" style={{ fontFamily: "Smooch Sans" }}>
               Xem phim hay, kết nối ngay
             </div>

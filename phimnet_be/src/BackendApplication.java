@@ -1,4 +1,4 @@
-package com.phimnet;
+﻿package com.cinex;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

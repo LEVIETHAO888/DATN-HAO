@@ -6,10 +6,13 @@ import {
   ChevronRight,
   Clapperboard,
   Film,
+  Building2,
   MonitorPlay,
   Shield,
+  ShoppingBag,
   Ticket,
   UserCog,
+  Tags
 } from "lucide-react";
 import { getRoleIdFromToken, isSystemAdmin } from "@/utils/jwt";
 
@@ -20,18 +23,18 @@ function formatMovieStatus(status) {
 
   switch (normalized) {
     case "now_showing":
-      return "Dang chieu";
+      return "Đang chiếu";
     case "coming_soon":
-      return "Sap chieu";
+      return "Sắp chiếu";
     case "ended":
-      return "Da ket thuc";
+      return "Đã kết thúc";
     default:
-      return "Khong xac dinh";
+      return "Không xác định";
   }
 }
 
 function formatShowtime(value) {
-  if (!value) return "Chua co lich";
+  if (!value) return "Chưa có lịch";
 
   try {
     return new Date(value).toLocaleString("vi-VN", {
@@ -44,6 +47,24 @@ function formatShowtime(value) {
   } catch {
     return String(value);
   }
+}
+
+async function parseResponseBody(response) {
+  const raw = await response.text();
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function getErrorMessage(response, body, fallbackMessage) {
+  if (typeof body === "string" && body.trim()) return body;
+  if (body && typeof body === "object" && body.message) return body.message;
+  if (response.status === 403) return "Bạn không có quyền truy cập một phần dữ liệu dashboard.";
+  return fallbackMessage;
 }
 
 function StatCard({ icon: Icon, label, value, tone }) {
@@ -74,6 +95,8 @@ export default function AdminDashboardPage() {
   const token = localStorage.getItem("accessToken");
   const roleId = getRoleIdFromToken(token);
   const canManageUsers = isSystemAdmin(roleId);
+  const isManager = roleId === 2;
+  const canManageBookings = isSystemAdmin(roleId) || isManager;
   const [movies, setMovies] = useState([]);
   const [showtimes, setShowtimes] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -89,25 +112,44 @@ export default function AdminDashboardPage() {
         const headers = { Authorization: `Bearer ${token}` };
         const [movieRes, showtimeRes, roomRes] = await Promise.all([
           fetch(`${API_BASE}/movies`, { headers }),
-          fetch(`${API_BASE}/admin/showtimes`, { headers }),
+          fetch(`${API_BASE}/showtimes`, { headers }),
           fetch(`${API_BASE}/rooms`, { headers }),
         ]);
 
-        const [movieData, showtimeData, roomData] = await Promise.all([
-          movieRes.json(),
-          showtimeRes.json(),
-          roomRes.json(),
+        const [movieBody, showtimeBody, roomBody] = await Promise.all([
+          parseResponseBody(movieRes),
+          parseResponseBody(showtimeRes),
+          parseResponseBody(roomRes),
         ]);
 
-        if (!movieRes.ok) throw new Error(movieData?.message || "Khong tai duoc danh sach phim");
-        if (!showtimeRes.ok) throw new Error(showtimeData?.message || "Khong tai duoc lich chieu");
-        if (!roomRes.ok) throw new Error(roomData?.message || "Khong tai duoc danh sach phong");
+        const messages = [];
 
-        setMovies(Array.isArray(movieData) ? movieData : []);
-        setShowtimes(Array.isArray(showtimeData) ? showtimeData : []);
-        setRooms(Array.isArray(roomData) ? roomData : []);
+        if (movieRes.ok) {
+          setMovies(Array.isArray(movieBody) ? movieBody : []);
+        } else {
+          setMovies([]);
+          messages.push(getErrorMessage(movieRes, movieBody, "Không tải được danh sách phim."));
+        }
+
+        if (showtimeRes.ok) {
+          setShowtimes(Array.isArray(showtimeBody) ? showtimeBody : []);
+        } else {
+          setShowtimes([]);
+          messages.push(getErrorMessage(showtimeRes, showtimeBody, "Không tải được lịch chiếu."));
+        }
+
+        if (roomRes.ok) {
+          setRooms(Array.isArray(roomBody) ? roomBody : []);
+        } else {
+          setRooms([]);
+          messages.push(getErrorMessage(roomRes, roomBody, "Không tải được danh sách phòng."));
+        }
+
+        if (messages.length) {
+          setError(messages.join(" "));
+        }
       } catch (err) {
-        setError(err.message || "Khong the tai dashboard");
+        setError(err.message || "Không thể tải dashboard");
       } finally {
         setLoading(false);
       }
@@ -144,29 +186,77 @@ export default function AdminDashboardPage() {
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-cyan-300/80">Admin Dashboard</p>
-                <h1 className="mt-3 text-3xl md:text-5xl font-black tracking-tight">Tong quan quan tri PhimNet</h1>
+                <h1 className="mt-3 text-3xl md:text-5xl font-black tracking-tight">Tổng quan quản trị CineX</h1>
                 <p className="mt-3 max-w-3xl text-gray-300">
-                  Theo doi nhanh tinh hinh phim, lich chieu va du lieu van hanh de dieu huong tac vu quan tri trong mot man hinh.
+                  Theo dõi nhanh tình hình phim, lịch chiếu và dữ liệu vận hành để điều hướng tác vụ quản trị trong một màn hình.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
+                {!isManager && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/admin/movies")}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#008bd0] hover:bg-[#0070a8] px-5 py-3 font-semibold transition"
+                    >
+                      <Film className="w-5 h-5" />
+                      Quản lý phim
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/admin/showtimes")}
+                      className="inline-flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 px-5 py-3 font-semibold text-black transition"
+                    >
+                      <CalendarClock className="w-5 h-5" />
+                      Quản lý lịch chiếu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/admin/cinemas")}
+                      className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 px-5 py-3 font-semibold text-black transition"
+                    >
+                      <Building2 className="w-5 h-5" />
+                      Quản lý rạp chiếu
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
-                  onClick={() => navigate("/admin/movies")}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#008bd0] hover:bg-[#0070a8] px-5 py-3 font-semibold transition"
+                  onClick={() => navigate("/admin/combos")}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 font-semibold text-black transition"
                 >
-                  <Film className="w-5 h-5" />
-                  Quan ly phim
+                  <ShoppingBag className="w-5 h-5" />
+                  Quản lý Combo
                 </button>
+                {canManageBookings && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin/bookings")}
+                    className="inline-flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 px-5 py-3 font-semibold text-white transition"
+                  >
+                    <Ticket className="w-5 h-5" />
+                    Quản lý Vé & Doanh thu
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => navigate("/admin/showtimes")}
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 px-5 py-3 font-semibold text-black transition"
+                  onClick={() => navigate("/admin/promotions")}
+                  className="inline-flex items-center gap-2 rounded-xl bg-rose-500 hover:bg-rose-600 px-5 py-3 font-semibold text-white transition"
                 >
-                  <CalendarClock className="w-5 h-5" />
-                  Quan ly lich chieu
+                  <Tags className="w-5 h-5" />
+                  Quản lý Ưu đãi
                 </button>
+                {canManageUsers && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin/users")}
+                    className="inline-flex items-center gap-2 rounded-xl bg-purple-500 hover:bg-purple-600 px-5 py-3 font-semibold text-white transition"
+                  >
+                    <UserCog className="w-5 h-5" />
+                    Quản lý tài khoản
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -176,29 +266,29 @@ export default function AdminDashboardPage() {
           ) : null}
 
           {loading ? (
-            <div className="mt-8 rounded-2xl border border-white/10 bg-[#1c1d1f] p-12 text-center text-gray-400">Dang tai dashboard...</div>
+            <div className="mt-8 rounded-2xl border border-white/10 bg-[#1c1d1f] p-12 text-center text-gray-400">Đang tải dashboard...</div>
           ) : (
             <>
               <div className="mt-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <StatCard icon={Clapperboard} label="Tong phim" value={movies.length} tone="blue" />
-                <StatCard icon={MonitorPlay} label="Dang chieu" value={stats.nowShowing} tone="emerald" />
-                <StatCard icon={Ticket} label="Sap chieu" value={stats.comingSoon} tone="amber" />
-                <StatCard icon={CalendarClock} label="Tong suat chieu" value={showtimes.length} tone="violet" />
+                <StatCard icon={Clapperboard} label="Tổng phim" value={movies.length} tone="blue" />
+                <StatCard icon={MonitorPlay} label="Đang chiếu" value={stats.nowShowing} tone="emerald" />
+                <StatCard icon={Ticket} label="Sắp chiếu" value={stats.comingSoon} tone="amber" />
+                <StatCard icon={CalendarClock} label="Tổng suất chiếu" value={showtimes.length} tone="violet" />
               </div>
 
               <div className="mt-8 grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
                 <div className="rounded-2xl border border-white/10 bg-[#1c1d1f] shadow-xl overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
                     <div>
-                      <h2 className="text-xl font-bold">Lich chieu sap toi</h2>
-                      <p className="text-sm text-gray-400 mt-1">5 suat chieu gan nhat de admin theo doi nhanh</p>
+                      <h2 className="text-xl font-bold">Lịch chiếu sắp tới</h2>
+                      <p className="text-sm text-gray-400 mt-1">5 suất chiếu gần nhất để theo dõi nhanh</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => navigate("/admin/showtimes")}
                       className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200 transition"
                     >
-                      Xem tat ca
+                      Xem tất cả
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -210,31 +300,31 @@ export default function AdminDashboardPage() {
                           <div>
                             <div className="font-semibold text-white">{showtime.movie?.title || `Phim #${showtime.movie?.id || "?"}`}</div>
                             <div className="text-sm text-gray-400 mt-1">
-                              {showtime.room?.cinema?.name || "Rap"} - {showtime.room?.name || "Phong"}
+                              {showtime.room?.cinema?.name || "Rạp"} - {showtime.room?.name || "Phòng"}
                             </div>
                           </div>
                           <div className="text-left md:text-right">
                             <div className="text-cyan-300 font-semibold">{formatShowtime(showtime.startTime)}</div>
                             <div className="text-sm text-amber-300 mt-1">
-                              {showtime.price != null ? `${Number(showtime.price).toLocaleString("vi-VN")} d` : "Chua co gia"}
+                              {showtime.price != null ? `${Number(showtime.price).toLocaleString("vi-VN")} đ` : "Chưa có giá"}
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="px-5 py-10 text-center text-gray-500">Chua co suat chieu nao.</div>
+                      <div className="px-5 py-10 text-center text-gray-500">Chưa có suất chiếu nào.</div>
                     )}
                   </div>
                 </div>
 
                 <div className="space-y-6">
                   <div className="rounded-2xl border border-white/10 bg-[#1c1d1f] shadow-xl p-5">
-                    <h2 className="text-xl font-bold">Tinh trang phim</h2>
+                    <h2 className="text-xl font-bold">Tình trạng phim</h2>
                     <div className="mt-4 space-y-3">
                       {[
-                        { label: "Dang chieu", value: stats.nowShowing, color: "bg-emerald-400" },
-                        { label: "Sap chieu", value: stats.comingSoon, color: "bg-amber-400" },
-                        { label: "Da ket thuc", value: stats.ended, color: "bg-gray-400" },
+                        { label: "Đang chiếu", value: stats.nowShowing, color: "bg-emerald-400" },
+                        { label: "Sắp chiếu", value: stats.comingSoon, color: "bg-amber-400" },
+                        { label: "Đã kết thúc", value: stats.ended, color: "bg-gray-400" },
                       ].map((item) => (
                         <div key={item.label} className="rounded-xl bg-white/[0.03] px-4 py-3 flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -248,26 +338,58 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-[#1c1d1f] shadow-xl p-5">
-                    <h2 className="text-xl font-bold">Nhanh tay thao tac</h2>
+                    <h2 className="text-xl font-bold">Danh sách chức năng</h2>
                     <div className="mt-4 grid grid-cols-1 gap-3">
                       {[
+                        ...(!isManager
+                          ? [
+                              {
+                                title: "Quản lý phim",
+                                desc: "Thêm, sửa thông tin phim, trailer, đạo diễn và diễn viên.",
+                                path: "/admin/movies",
+                                icon: Film,
+                              },
+                              {
+                                title: "Quản lý lịch chiếu",
+                                desc: "Theo dõi suất chiếu, phòng chiếu và giá vé.",
+                                path: "/admin/showtimes",
+                                icon: CalendarClock,
+                              },
+                              {
+                                title: "Quản lý rạp chiếu",
+                                desc: "Tạo mới rạp để phục vụ cấu hình phòng và suất chiếu.",
+                                path: "/admin/cinemas",
+                                icon: Building2,
+                              },
+                            ]
+                          : []),
                         {
-                          title: "Quan ly phim",
-                          desc: "Them, sua thong tin phim, trailer, dao dien va dien vien.",
-                          path: "/admin/movies",
-                          icon: Film,
+                          title: "Quản lý Combo",
+                          desc: "Thêm, sửa, xóa các combo bắp nước bán kèm.",
+                          path: "/admin/combos",
+                          icon: ShoppingBag,
                         },
                         {
-                          title: "Quan ly lich chieu",
-                          desc: "Theo doi suat chieu, phong chieu va gia ve.",
-                          path: "/admin/showtimes",
-                          icon: CalendarClock,
+                          title: "Quản lý Ưu đãi",
+                          desc: "Quản lý các chương trình khuyến mãi, mã giảm giá.",
+                          path: "/admin/promotions",
+                          icon: Tags,
                         },
+                        ...(canManageBookings
+                          ? [
+                              {
+                                title: "Quản lý Vé & Doanh thu",
+                                desc: "Kiểm tra toàn bộ đơn đặt vé và tính toán tổng doanh thu.",
+                                path: "/admin/bookings",
+                                icon: Ticket,
+                              },
+                            ]
+                          : []),
                         ...(canManageUsers
                           ? [
                               {
-                                title: "Quan ly nguoi dung",
-                                desc: "Xem danh sach tai khoan, role va tao nguoi dung moi.",
+                                title: "Quản lý người dùng",
+                                desc: "Xem danh sách tài khoản, role và phân quyền người dùng.",
                                 path: "/admin/users",
                                 icon: UserCog,
                               },
@@ -298,14 +420,14 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-[#1c1d1f] shadow-xl p-5">
-                    <h2 className="text-xl font-bold">He thong</h2>
+                    <h2 className="text-xl font-bold">Hệ thống</h2>
                     <div className="mt-4 flex items-center justify-between rounded-xl bg-white/[0.03] px-4 py-3">
-                      <span className="text-gray-300">So phong chieu</span>
+                      <span className="text-gray-300">Số phòng chiếu</span>
                       <span className="font-bold text-white">{rooms.length}</span>
                     </div>
                     {canManageUsers ? (
                       <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.03] px-4 py-3">
-                        <span className="text-gray-300">Quyen he thong</span>
+                        <span className="text-gray-300">Quyền hệ thống</span>
                         <span className="inline-flex items-center gap-2 font-bold text-amber-300">
                           <Shield className="w-4 h-4" />
                           Admin
@@ -318,16 +440,16 @@ export default function AdminDashboardPage() {
 
               <div className="mt-8 rounded-2xl border border-white/10 bg-[#1c1d1f] shadow-xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-white/10">
-                  <h2 className="text-xl font-bold">Danh sach phim gan day</h2>
+                  <h2 className="text-xl font-bold">Danh sách phim gần đây</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-black/30 text-gray-400 uppercase text-xs tracking-wide">
                       <tr>
-                        <th className="px-5 py-3 font-semibold">Ten phim</th>
-                        <th className="px-5 py-3 font-semibold hidden md:table-cell">Trang thai</th>
-                        <th className="px-5 py-3 font-semibold hidden lg:table-cell">The loai</th>
-                        <th className="px-5 py-3 font-semibold hidden md:table-cell">Dao dien</th>
+                        <th className="px-5 py-3 font-semibold">Tên phim</th>
+                        <th className="px-5 py-3 font-semibold hidden md:table-cell">Trạng thái</th>
+                        <th className="px-5 py-3 font-semibold hidden lg:table-cell">Thể loại</th>
+                        <th className="px-5 py-3 font-semibold hidden md:table-cell">Đạo diễn</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -339,13 +461,13 @@ export default function AdminDashboardPage() {
                               {formatMovieStatus(movie.status)}
                             </span>
                           </td>
-                          <td className="px-5 py-3 hidden lg:table-cell text-gray-400">{movie.genre || "Dang cap nhat"}</td>
-                          <td className="px-5 py-3 hidden md:table-cell text-gray-400">{movie.director || "Dang cap nhat"}</td>
+                          <td className="px-5 py-3 hidden lg:table-cell text-gray-400">{movie.genre || "Đang cập nhật"}</td>
+                          <td className="px-5 py-3 hidden md:table-cell text-gray-400">{movie.director || "Đang cập nhật"}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {!movies.length ? <div className="px-5 py-10 text-center text-gray-500">Chua co phim nao.</div> : null}
+                  {!movies.length ? <div className="px-5 py-10 text-center text-gray-500">Chưa có phim nào.</div> : null}
                 </div>
               </div>
             </>

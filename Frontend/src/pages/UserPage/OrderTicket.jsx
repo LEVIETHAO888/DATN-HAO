@@ -2,15 +2,18 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { Calendar, Clock, MonitorPlay, Armchair, ChevronLeft, CreditCard, ArrowRight } from "lucide-react";
+import { Calendar, Clock, MonitorPlay, Armchair, ChevronLeft, CreditCard, ArrowRight, Film, Star } from "lucide-react";
 import useNagivateLoading from "@/hooks/useNagivateLoading";
 import { isSameLocalDay } from "@/utils/showDate";
+
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/$/, "");
 
 export default function OrderTicket() {
   const [searchParams] = useSearchParams();
   const movieId = searchParams.get("movieId");
   const cinemaId = searchParams.get("cinemaId");
   const showDate = searchParams.get("showDate");
+  const initialShowtimeId = searchParams.get("showtimeId");
   const navigate = useNavigate();
   const navigateLoading = useNagivateLoading();
 
@@ -22,30 +25,91 @@ export default function OrderTicket() {
   const [selectedShowtime, setSelectedShowtime] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
 
-  // MOCK SEAT GENERATION
-  const ROWS = 8;
-  const COLS = 10;
-  
-  // To keep states stable between re-renders, we use state for seat grid
   const [seatMap, setSeatMap] = useState([]);
+  const [loadingSeats, setLoadingSeats] = useState(false);
+
+  // --- NOW SHOWING movies (only used when no movieId in URL) ---
+  const [nowShowingMovies, setNowShowingMovies] = useState([]);
+  const [loadingMovies, setLoadingMovies] = useState(false);
 
   useEffect(() => {
-    const seatGrid = [];
-    for (let r = 0; r < ROWS; r++) {
-      const rowChar = String.fromCharCode(65 + r); // A, B, C...
-      const rowSeats = [];
-      for (let c = 1; c <= COLS; c++) {
-        const seatId = r * COLS + c; // 1 to 80
-        rowSeats.push({
-          id: seatId,
-          label: `${rowChar}${c}`,
-          status: Math.random() > 0.85 ? "booked" : "available", // Mock 15% booked seats for realism
-        });
+    if (movieId) return; // already have a movie selected
+    const fetchNowShowing = async () => {
+      setLoadingMovies(true);
+      try {
+        const token = localStorage.getItem("accessToken");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE}/movies?status=now_showing`, { headers });
+        const data = await res.json();
+        setNowShowingMovies(Array.isArray(data) ? data : (data?.data || []));
+      } catch (e) {
+        console.error("Lỗi tải phim đang chiếu:", e);
+      } finally {
+        setLoadingMovies(false);
       }
-      seatGrid.push({ rowLabel: rowChar, seats: rowSeats });
+    };
+    fetchNowShowing();
+  }, [movieId]);
+
+  useEffect(() => {
+    if (!selectedShowtime?.id) {
+       setSeatMap([]);
+       return;
     }
-    setSeatMap(seatGrid);
-  }, []);
+    
+    let isCancelled = false;
+    const fetchSeats = async () => {
+       setLoadingSeats(true);
+       try {
+          const token = localStorage.getItem("accessToken");
+          const headers = { "Content-Type": "application/json" };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/$/, "");
+          
+          const res = await fetch(`${API_BASE}/showtimes/${selectedShowtime.id}/seats`, { headers });
+          const jsData = await res.json();
+          let apiSeats = jsData;
+          if (jsData && jsData.data) apiSeats = jsData.data;
+          if (!Array.isArray(apiSeats)) apiSeats = [];
+
+          if (isCancelled) return;
+
+          const sMap = {};
+          apiSeats.forEach(seat => {
+              // Row label e.g., 'A' from 'A1'
+              let rLabel = '?';
+              if (seat.seatNumber && seat.seatNumber.length > 0) {
+                 rLabel = seat.seatNumber.charAt(0).toUpperCase();
+              }
+              if (!sMap[rLabel]) sMap[rLabel] = [];
+              sMap[rLabel].push({
+                 id: seat.id,
+                 label: seat.seatNumber,
+                 // handle both boolean naming conventions
+                 status: (seat.booked === true || seat.isBooked === true) ? "booked" : "available",
+                 type: seat.type || "NORMAL"
+              });
+          });
+
+          const formattedGrid = Object.keys(sMap).sort().map(rowLab => ({
+              rowLabel: rowLab,
+              seats: sMap[rowLab].sort((a,b) => {
+                 const nA = parseInt(a.label.substring(1)) || 0;
+                 const nB = parseInt(b.label.substring(1)) || 0;
+                 return nA - nB;
+              })
+          }));
+          setSeatMap(formattedGrid);
+       } catch(e) {
+          console.error("Lỗi tải sơ đồ ghế: ", e);
+       } finally {
+          if (!isCancelled) setLoadingSeats(false);
+       }
+    };
+    fetchSeats();
+    return () => { isCancelled = true; };
+  }, [selectedShowtime]);
 
   useEffect(() => {
     const fetchContext = async () => {
@@ -89,6 +153,13 @@ export default function OrderTicket() {
         }
         setShowtimes(list);
 
+        if (initialShowtimeId) {
+           const found = list.find(s => String(s.id) === String(initialShowtimeId));
+           if (found) {
+              setSelectedShowtime(found);
+           }
+        }
+
       } catch (e) {
          setError("Có lỗi khi kết nối với máy chủ.");
          console.error(e);
@@ -101,9 +172,11 @@ export default function OrderTicket() {
   }, [movieId, cinemaId, showDate]);
 
   useEffect(() => {
-    setSelectedShowtime(null);
+    if (!initialShowtimeId) {
+      setSelectedShowtime(null);
+    }
     setSelectedSeats([]);
-  }, [movieId, cinemaId, showDate]);
+  }, [movieId, cinemaId, showDate, initialShowtimeId]);
 
   const toggleSeat = (seatId) => {
     if (selectedSeats.includes(seatId)) {
@@ -124,7 +197,7 @@ export default function OrderTicket() {
         return id;
       })
       .join(", ");
-    navigate("/order-ticket/combo", {
+    navigate("/order-combo", {
       state: {
         movieId,
         movieTitle: movie.title,
@@ -136,19 +209,96 @@ export default function OrderTicket() {
     });
   };
 
+  // ── Show movie picker when no movieId ──
+  if (!movieId) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-[#0b0f19] text-white pt-24 pb-16 px-4 md:px-10">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-10">
+              <p className="text-sm uppercase tracking-[0.3em] text-[#008bd0]/80 mb-2">Mua vé ngay</p>
+              <h1 className="text-4xl md:text-5xl font-black tracking-tight">Chọn Phim <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#008bd0] to-cyan-300">Đang Chiếu</span></h1>
+              <p className="mt-3 text-gray-400">Chọn một bộ phim bạn muốn xem để tiếp tục đặt vé.</p>
+            </div>
+
+            {loadingMovies ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl bg-[#1c1d1f] animate-pulse" style={{ height: 320 }} />
+                ))}
+              </div>
+            ) : nowShowingMovies.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-32 text-gray-500">
+                <Film className="w-16 h-16 mb-4 opacity-30" />
+                <p className="text-xl font-semibold">Hiện chưa có phim nào đang chiếu.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                {nowShowingMovies.map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => navigate(`/order-ticket?movieId=${m.id}`)}
+                    className="group relative rounded-2xl overflow-hidden border border-white/5 bg-[#1c1d1f] cursor-pointer hover:border-[#008bd0]/50 hover:shadow-[0_0_30px_rgba(0,139,208,0.2)] transition-all duration-300 hover:-translate-y-1"
+                  >
+                    {/* Poster */}
+                    <div className="relative aspect-[2/3] overflow-hidden">
+                      <img
+                        src={m.posterUrl || m.thumbnailUrl || "/default.png"}
+                        alt={m.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                      {/* Age badge */}
+                      {m.ageLimit && (
+                        <span className="absolute top-2 right-2 bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded">{m.ageLimit}</span>
+                      )}
+                      {/* Rating */}
+                      {m.rating && (
+                        <span className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-lg backdrop-blur-sm">
+                          <Star className="w-3 h-3 fill-amber-400" />{Number(m.rating).toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3">
+                      <h3 className="font-bold text-white text-sm leading-tight line-clamp-2 group-hover:text-[#00bfff] transition-colors mb-1.5">{m.title}</h3>
+                      <div className="flex flex-wrap gap-1">
+                        {m.genre && <span className="text-[10px] bg-white/10 text-gray-300 px-2 py-0.5 rounded-full">{m.genre}</span>}
+                        {m.duration && <span className="text-[10px] bg-white/10 text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />{m.duration}p</span>}
+                      </div>
+                    </div>
+
+                    {/* Hover CTA */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#008bd0]/20 backdrop-blur-[1px]">
+                      <div className="bg-[#008bd0] text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+                        <ArrowRight className="w-4 h-4" /> Chọn suất chiếu
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // movieId is present — show loading / error states for the ticket selection flow
   if (loading) {
-     return <Layout><div className="min-h-screen bg-[#0b0f19] flex justify-center items-center text-white text-xl font-bold">Đang tải biểu đồ lịch chiếu...</div></Layout>;
+    return <Layout><div className="min-h-screen bg-[#0b0f19] flex justify-center items-center text-white text-xl font-bold">Đang tải biểu đồ lịch chiếu...</div></Layout>;
   }
 
   if (error || !movie) {
-     return (
-       <Layout>
-         <div className="min-h-screen bg-[#0b0f19] flex flex-col justify-center items-center text-white gap-4">
-            <div className="text-xl font-bold text-red-400">{error || "Không tìm thấy phim"}</div>
-            <button onClick={() => navigateLoading("/social/home")} className="px-6 py-2 bg-[#008bd0] hover:bg-[#0070a8] font-bold rounded-lg transition-colors">Quay lại Trang Chủ</button>
-         </div>
-       </Layout>
-     );
+    return (
+      <Layout>
+        <div className="min-h-screen bg-[#0b0f19] flex flex-col justify-center items-center text-white gap-4">
+          <div className="text-xl font-bold text-red-400">{error || "Không tìm thấy phim"}</div>
+          <button onClick={() => navigateLoading("/")} className="px-6 py-2 bg-[#008bd0] hover:bg-[#0070a8] font-bold rounded-lg transition-colors">Quay lại Trang Chủ</button>
+        </div>
+      </Layout>
+    );
   }
 
   const totalPrice = selectedShowtime ? selectedShowtime.price * selectedSeats.length : 0;
@@ -216,7 +366,12 @@ export default function OrderTicket() {
 
                {/* SƠ ĐỒ LƯỚI GHẾ NGỒI */}
                {selectedShowtime && (
-               <div className="bg-[#1c1d1f] p-6 rounded-2xl border border-white/5 shadow-2xl flex flex-col items-center overflow-hidden">
+               <div className="bg-[#1c1d1f] p-6 rounded-2xl border border-white/5 shadow-2xl flex flex-col items-center overflow-hidden relative">
+                  {loadingSeats && (
+                    <div className="absolute inset-0 bg-[#1c1d1f]/80 backdrop-blur-sm z-20 flex justify-center items-center rounded-2xl">
+                       <div className="text-white font-bold text-lg animate-pulse">Đang truy xuất sơ đồ ghế...</div>
+                    </div>
+                  )}
                   <h2 className="text-xl font-bold mb-8 flex items-center gap-2 self-start"><Armchair className="text-green-500 w-6 h-6"/> Sơ đồ phòng chiếu</h2>
                   
                   {/* Theater Screen Graphics */}
@@ -249,7 +404,7 @@ export default function OrderTicket() {
                                       onClick={() => toggleSeat(seat.id)}
                                       className={`w-9 h-9 sm:w-11 sm:h-11 rounded-t-xl rounded-b-md flex items-center justify-center text-xs sm:text-sm transition-all duration-200 ${bgClass}`}
                                     >
-                                      {isSelected ? seat.id : seat.label.slice(1)}
+                                      {seat.label.substring(1)}
                                     </button>
                                   );
                                })}
@@ -289,8 +444,8 @@ export default function OrderTicket() {
                   <div className="p-7 flex-1 space-y-6">
                      <div className="flex flex-col border-b border-dashed border-white/10 pb-5">
                         <span className="text-gray-500 text-sm font-semibold tracking-wide uppercase mb-1">Rạp chiếu</span>
-                        <span className="font-bold text-white text-xl">PhimNet Cinema</span>
-                        <span className="text-gray-400 text-sm mt-1">Rạp số 03 định dạng 2D</span>
+                        <span className="font-bold text-white text-xl">{selectedShowtime ? (selectedShowtime.room?.cinema?.name || "Rạp PhimNet") : "Chưa xác định"}</span>
+                        <span className="text-gray-400 text-sm mt-1">{selectedShowtime ? (selectedShowtime.room?.name || "Phòng chiếu tiêu chuẩn") : ""}</span>
                      </div>
                      
                      <div className="flex flex-col border-b border-dashed border-white/10 pb-5">
