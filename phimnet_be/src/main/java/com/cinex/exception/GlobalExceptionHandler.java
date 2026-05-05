@@ -15,7 +15,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleMaxUpload(MaxUploadSizeExceededException e) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of(
                 "message",
-                "File vượt quá dung lượng cho phép (tối đa 100MB). Hãy chọn ảnh/video nhỏ hơn hoặc nén lại.",
+                "File vượt quá dung lượng cho phép (tối đa 100MB). Hãy chọn ảnh nhỏ hơn.",
                 "error",
                 "Maximum upload size exceeded"));
     }

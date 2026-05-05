@@ -8,6 +8,7 @@ public class BookingRequest {
     private Long showtimeId;
     private List<Long> seatIds;
     private List<ComboRequest> combos;
+    private String promotionCode;
 
     @Data
     public static class ComboRequest {

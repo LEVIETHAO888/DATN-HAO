@@ -179,7 +179,7 @@ const PersonalPage = () => {
           localStorage.setItem("userLogin", JSON.stringify({ ...current, ...updatedProfile }));
           // Phát event để Header biết localStorage thay đổi
           window.dispatchEvent(new Event("storage"));
-        } catch (_) {}
+        } catch (_) { }
 
         setProfileStatus({ type: "success", message: "Cập nhật hồ sơ thành công!" });
         setTimeout(() => {
@@ -519,14 +519,13 @@ const PersonalPage = () => {
                         <h3 className="font-bold text-white text-base group-hover:text-[#00bfff] transition-colors">
                           {b.showtime?.movie?.title || `Vé #${b.id}`}
                         </h3>
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                          b.status === "CANCELLED"
-                            ? "bg-red-500/20 text-red-400"
-                            : b.status === "PAID"
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${b.status?.toLowerCase() === "cancelled"
+                          ? "bg-red-500/20 text-red-400"
+                          : (b.status?.toLowerCase() === "paid" || b.status?.toLowerCase() === "confirmed")
                             ? "bg-green-500/20 text-green-400"
                             : "bg-amber-500/20 text-amber-400"
-                        }`}>
-                          {b.status === "CANCELLED" ? "Đã huỷ" : b.status === "PAID" ? "Đã thanh toán" : b.status || "Chờ thanh toán"}
+                          }`}>
+                          {b.status?.toLowerCase() === "cancelled" ? "Đã huỷ" : b.status?.toLowerCase() === "paid" ? "Đã thanh toán" : b.status?.toLowerCase() === "confirmed" ? "Thành công" : b.status?.toLowerCase() === "pending" ? "Chờ thanh toán" : b.status || "Chờ thanh toán"}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-4 text-sm text-gray-400 mt-1">

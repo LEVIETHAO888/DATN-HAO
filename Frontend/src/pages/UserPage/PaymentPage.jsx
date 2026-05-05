@@ -14,6 +14,8 @@ import {
   Lock,
   Zap,
   Clock,
+  Tag,
+  X,
 } from "lucide-react";
 import useNagivateLoading from "@/hooks/useNagivateLoading";
 
@@ -116,6 +118,12 @@ export default function PaymentPage() {
   const [isPaying, setIsPaying] = useState(false);
   const [payStep, setPayStep] = useState("idle"); // idle | booking | payment | redirecting
 
+  // ── Promotion code state ─────────────────────────────────────────
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null); // { title, discountPercentage, code }
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
   // Guard: Kiểm tra state hợp lệ
   if (
     !state ||
@@ -137,8 +145,46 @@ export default function PaymentPage() {
     combos = [],
     ticketTotal = 0,
     comboTotal = 0,
-    grandTotal = 0,
+    grandTotal: originalGrandTotal = 0,
   } = state;
+
+  // Tính tổng tiền sau giảm giá
+  const discountAmount = appliedPromo
+    ? Math.round((originalGrandTotal * appliedPromo.discountPercentage) / 100)
+    : 0;
+  const grandTotal = Math.max(0, originalGrandTotal - discountAmount);
+
+  // ── Xử lý áp dụng mã khuyến mãi ────────────────────────────────
+  const handleApplyCode = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoLoading(true);
+    setPromoError("");
+    setAppliedPromo(null);
+    try {
+      const API_BASE = (
+        import.meta.env.VITE_API_URL || "http://localhost:8080/api"
+      ).replace(/\/$/, "");
+      const res = await fetch(`${API_BASE}/promotions/validate?code=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const promo = await res.json();
+        setAppliedPromo(promo);
+        setPromoError("");
+      } else {
+        setPromoError("Mã không hợp lệ hoặc đã hết hạn.");
+      }
+    } catch {
+      setPromoError("Không thể kết nối server.");
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError("");
+  };
 
   const showtimeDate = showtime?.startTime ? new Date(showtime.startTime) : null;
   const seatCount = seatIds.length;
@@ -169,7 +215,8 @@ export default function PaymentPage() {
           combos: combos.map(c => ({
             comboId: Number(c.id),
             quantity: Number(c.qty)
-          }))
+          })),
+          promotionCode: appliedPromo ? appliedPromo.code : null,
         }),
       });
 
@@ -432,6 +479,69 @@ export default function PaymentPage() {
                     <span className="text-emerald-400 font-semibold">Miễn phí</span>
                   </div>
 
+                  {/* Dòng giảm giá nếu có promo */}
+                  {appliedPromo && discountAmount > 0 && (
+                    <div className="flex justify-between text-sm bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                      <span className="text-emerald-400 flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" />
+                        Giảm {appliedPromo.discountPercentage}% ({appliedPromo.title})
+                      </span>
+                      <span className="font-bold text-emerald-400">-{discountAmount.toLocaleString("vi-VN")} đ</span>
+                    </div>
+                  )}
+
+                  {/* Promotion code input */}
+                  <div className="pt-2">
+                    {!appliedPromo ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                            <input
+                              id="promo-code-input"
+                              type="text"
+                              value={promoInput}
+                              onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(""); }}
+                              onKeyDown={e => e.key === "Enter" && handleApplyCode()}
+                              placeholder="Nhập mã ưu đãi"
+                              className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#008bd0]/60 transition"
+                            />
+                          </div>
+                          <button
+                            id="btn-apply-promo"
+                            onClick={handleApplyCode}
+                            disabled={promoLoading || !promoInput.trim()}
+                            className="px-4 py-2 rounded-lg text-sm font-bold bg-white/8 border border-white/10 text-gray-300 hover:bg-[#008bd0]/20 hover:border-[#008bd0]/40 hover:text-white transition disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            {promoLoading ? (
+                              <div className="w-4 h-4 border-2 border-gray-500/30 border-t-gray-400 rounded-full animate-spin" />
+                            ) : "Áp dụng"}
+                          </button>
+                        </div>
+                        {promoError && (
+                          <p className="text-xs text-red-400 flex items-center gap-1">
+                            <X className="w-3 h-3" />{promoError}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between bg-emerald-500/8 border border-emerald-500/25 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">{appliedPromo.code}</span>
+                          <span className="text-xs text-emerald-400/60">đã áp dụng</span>
+                        </div>
+                        <button
+                          onClick={handleRemovePromo}
+                          className="text-gray-500 hover:text-red-400 transition"
+                          title="Xóa mã"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Total */}
                   <div className="pt-4 border-t border-dashed border-white/10">
                     <div className="flex items-end justify-between">
@@ -440,6 +550,11 @@ export default function PaymentPage() {
                         <div className="text-xs text-gray-600 mt-0.5">Đã bao gồm VAT</div>
                       </div>
                       <div className="text-right">
+                        {appliedPromo && discountAmount > 0 && (
+                          <div className="text-sm text-gray-500 line-through mb-0.5">
+                            {originalGrandTotal.toLocaleString("vi-VN")} đ
+                          </div>
+                        )}
                         <div className="text-4xl font-black text-white tracking-tight leading-none">
                           {grandTotal.toLocaleString("vi-VN")}
                         </div>
@@ -508,6 +623,7 @@ export default function PaymentPage() {
                         </div>
                         <div className="text-[#FFCC00] text-xs font-bold normal-case opacity-90">
                           {grandTotal.toLocaleString("vi-VN")} đồng
+                          {appliedPromo && <span className="ml-1 text-emerald-300 text-[10px]">(-{appliedPromo.discountPercentage}%)</span>}
                         </div>
                       </>
                     )}

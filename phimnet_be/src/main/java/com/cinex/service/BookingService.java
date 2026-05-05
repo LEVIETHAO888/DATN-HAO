@@ -6,6 +6,8 @@ import com.cinex.entity.*;
 import com.cinex.repository.*;
 import com.cinex.dto.BookingRequest;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -18,6 +20,7 @@ public class BookingService {
     private final ShowtimeRepository showtimeRepository;
     private final ComboRepository comboRepository;
     private final BookingComboRepository bookingComboRepository;
+    private final PromotionRepository promotionRepository;
 
     public Booking create(User user, BookingRequest req) {
         Long showtimeId = req.getShowtimeId();
@@ -32,7 +35,7 @@ public class BookingService {
         }
 
         BigDecimal totalSeatsPrice = showtime.getPrice().multiply(BigDecimal.valueOf(seatIds.size()));
-        
+
         BigDecimal totalCombosPrice = BigDecimal.ZERO;
         if (req.getCombos() != null && !req.getCombos().isEmpty()) {
             for (BookingRequest.ComboRequest cr : req.getCombos()) {
@@ -41,12 +44,38 @@ public class BookingService {
                 totalCombosPrice = totalCombosPrice.add(itemTotal);
             }
         }
-        
-        BigDecimal totalPrice = totalSeatsPrice.add(totalCombosPrice);
+
+        BigDecimal subtotal = totalSeatsPrice.add(totalCombosPrice);
+
+        // ── Xử lý mã khuyến mãi ──────────────────────────────────────
+        Promotion appliedPromotion = null;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+
+        String code = req.getPromotionCode();
+        if (code != null && !code.isBlank()) {
+            LocalDateTime now = LocalDateTime.now();
+            appliedPromotion = promotionRepository.findByCodeIgnoreCaseAndActiveTrue(code)
+                    .filter(p -> {
+                        boolean startOk = p.getStartDate() == null || !p.getStartDate().isAfter(now);
+                        boolean endOk = p.getEndDate() == null || !p.getEndDate().isBefore(now);
+                        return startOk && endOk;
+                    })
+                    .orElse(null);
+
+            if (appliedPromotion != null && appliedPromotion.getDiscountPercentage() != null) {
+                discountAmount = subtotal
+                        .multiply(BigDecimal.valueOf(appliedPromotion.getDiscountPercentage()))
+                        .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+            }
+        }
+
+        BigDecimal totalPrice = subtotal.subtract(discountAmount).max(BigDecimal.ZERO);
 
         Booking b = new Booking();
         b.setUser(user);
         b.setShowtime(showtime);
+        b.setPromotion(appliedPromotion);
+        b.setDiscountAmount(discountAmount);
         b.setTotalPrice(totalPrice);
         b.setStatus("pending");
 

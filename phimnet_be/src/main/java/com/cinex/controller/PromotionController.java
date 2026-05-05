@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -51,6 +52,24 @@ public class PromotionController {
         List<Promotion> result = new ArrayList<>(deduplicated.values());
         result.sort(Comparator.comparing(Promotion::getId).reversed());
         return result;
+    }
+
+    /**
+     * Validate mã khuyến mãi trước khi đặt vé.
+     * GET /api/promotions/validate?code=SUMMER20
+     * Trả về promotion nếu hợp lệ, 404 nếu không tìm thấy / hết hạn.
+     */
+    @GetMapping("/validate")
+    public ResponseEntity<Promotion> validateCode(@RequestParam String code) {
+        LocalDateTime now = LocalDateTime.now();
+        return promotionRepository.findByCodeIgnoreCaseAndActiveTrue(code)
+                .filter(p -> {
+                    boolean startOk = p.getStartDate() == null || !p.getStartDate().isAfter(now);
+                    boolean endOk = p.getEndDate() == null || !p.getEndDate().isBefore(now);
+                    return startOk && endOk;
+                })
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping

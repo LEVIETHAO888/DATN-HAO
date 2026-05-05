@@ -20,8 +20,16 @@ public class Booking {
     @ManyToOne
     private Showtime showtime;
 
+    @ManyToOne
+    @JoinColumn(name = "promotion_id")
+    private Promotion promotion;
+
     @Column(name = "total_price")
     private BigDecimal totalPrice;
+
+    @Column(name = "discount_amount")
+    private BigDecimal discountAmount;
+
     private String status;
 
     @Column(name = "created_at")

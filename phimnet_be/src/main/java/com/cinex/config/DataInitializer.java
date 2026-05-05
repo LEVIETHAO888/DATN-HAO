@@ -52,7 +52,7 @@ public class DataInitializer implements CommandLineRunner {
 
         if (cinemaRepository.count() == 0) {
             Cinema c = new Cinema();
-            c.setName("PhimNet Cinema");
+            c.setName("CineX");
             c.setLocation("Hà Nội");
             cinemaRepository.save(c);
         }
@@ -79,9 +79,9 @@ public class DataInitializer implements CommandLineRunner {
                 .findAll()
                 .forEach(
                         promotion -> {
-                            boolean withinTimeRange =
-                                    (promotion.getStartDate() == null || !promotion.getStartDate().isAfter(now))
-                                            && (promotion.getEndDate() == null || !promotion.getEndDate().isBefore(now));
+                            boolean withinTimeRange = (promotion.getStartDate() == null
+                                    || !promotion.getStartDate().isAfter(now))
+                                    && (promotion.getEndDate() == null || !promotion.getEndDate().isBefore(now));
                             if (withinTimeRange && !promotion.isActive()) {
                                 promotion.setActive(true);
                                 promotionRepository.save(promotion);
